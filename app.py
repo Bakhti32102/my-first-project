@@ -4,10 +4,6 @@ import os
 from duckduckgo_search import DDGS
 from PIL import Image
 import PyPDF2
-import edge_tts
-import asyncio
-from audio_recorder_streamlit import audio_recorder
-import io
 import requests
 
 # Page Config
@@ -29,9 +25,9 @@ st.markdown("""
 
 # Title Header
 st.title("🤖 Habib's Smart Vision & Multi-Tool Agent")
-st.caption("⚡ Powered by Groq | Natural Voice, Vision, Documents, Weather, Search & Math")
+st.caption("⚡ Powered by Groq | Vision, Documents, Weather, Search & Math")
 
-# Initialize Groq Client (API key Streamlit Secrets ya Environment Variable se uthayega)
+# Initialize Groq Client
 try:
     groq_client = groq.Groq(api_key=os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY"))
 except Exception as e:
@@ -65,19 +61,6 @@ def get_weather(city):
         pass
     return "Weather info unavailable."
 
-# Helper function to generate Natural AI Urdu Voice (Edge-TTS)
-def speak_text(text):
-    async def _generate():
-        communicate = edge_tts.Communicate(text, "ur-PK-UzmaNeural")
-        fp = io.BytesIO()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                fp.write(chunk["data"])
-        fp.seek(0)
-        return fp
-
-    return asyncio.run(_generate())
-
 # Conversation Memory Initializer
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -93,11 +76,7 @@ def get_chat_history_text():
 # Sidebar Controls
 with st.sidebar:
     st.header("⚙️ Agent Control Panel")
-    st.info("💡 **Agent Capabilities:**\n- 🎙️ Natural AI Voice\n- 📜 Export Chat\n- 🖼️ Vision Analysis\n- 📄 Document Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
-    
-    st.subheader("🎙️ Voice Input")
-    st.write("Mic icon par click karke bolein:")
-    audio_bytes = audio_recorder(text="", recording_color="#e11d48", neutral_color="#2563eb", icon_name="microphone", icon_size="2x")
+    st.info("💡 **Agent Capabilities:**\n- 📜 Export Chat\n- 🖼️ Vision Analysis\n- 📄 Document Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
     
     st.subheader("📁 Upload File / Image")
     uploaded_file = st.file_uploader("Upload Image or PDF", type=["png", "jpg", "jpeg", "pdf", "txt"])
@@ -156,12 +135,7 @@ for message in st.session_state.messages:
         st.write(message["content"])
 
 # Handle Input
-user_query = st.chat_input("Poochein ya mic use karein...")
-
-if audio_bytes and "audio_processed" not in st.session_state:
-    st.session_state["audio_processed"] = True
-    prompt_input = "Audio recording received. Please respond."
-
+user_query = st.chat_input("Yahan apna sawal likhein...")
 final_query = user_query if user_query else prompt_input
 
 if final_query:
@@ -170,11 +144,10 @@ if final_query:
         st.write(final_query)
 
     with st.chat_message("assistant"):
-        with st.spinner("Agent thinking & generating response..."):
+        with st.spinner("Agent thinking..."):
             response_text = ""
-            
-            # Simple keyword tool augmentation logic
             query_lower = final_query.lower()
+            
             if "weather" in query_lower or "mausam" in query_lower or "karachi" in query_lower:
                 weather_info = get_weather("Karachi")
                 response_text = f"Weather update: {weather_info}"
@@ -182,7 +155,6 @@ if final_query:
                 search_res = web_search(final_query)
                 response_text = f"Latest findings:\n{search_res}"
             else:
-                # Standard Groq LLM Completion
                 if groq_client:
                     try:
                         messages_payload = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[-5:]]
@@ -198,15 +170,7 @@ if final_query:
                     except Exception as e:
                         response_text = f"API Error: {str(e)}"
                 else:
-                    response_text = f"Aapka sawal mil gaya: '{final_query}'. (Note: Groq API Key configure nahi hai)."
+                    response_text = f"Aapka sawal mil gaya: '{final_query}'. (Groq API Key configure nahi hai)."
             
             st.write(response_text)
-            
-            # Voice Output Generation
-            try:
-                audio_fp = speak_text(response_text)
-                st.audio(audio_fp, format='audio/mp3')
-            except Exception:
-                pass
-            
             st.session_state.messages.append({"role": "assistant", "content": response_text})

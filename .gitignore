@@ -1,0 +1,9 @@
+# Streamlit secrets file (API keys, passwords, etc.)
+.streamlit/secrets.toml
+.streamlit/
+
+# Python cache & virtual environment files
+__pycache__/
+*.pyc
+.env
+venv/

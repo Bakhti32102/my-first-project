@@ -4,7 +4,9 @@ import os
 from duckduckgo_search import DDGS
 from PIL import Image
 import PyPDF2
-import base64
+from gtts import gTTS
+from audio_recorder_streamlit import audio_recorder
+import io
 
 # Page Config
 st.set_page_config(
@@ -25,7 +27,7 @@ st.markdown("""
 
 # Title Header
 st.title("🤖 Habib's Smart Vision & Multi-Tool Agent")
-st.caption("⚡ Powered by Groq | Vision, Documents, Weather, Search & Math")
+st.caption("⚡ Powered by Groq | Vision, Voice, Documents, Weather, Search & Math")
 
 # Helper function to read PDF
 def read_pdf(file):
@@ -35,10 +37,22 @@ def read_pdf(file):
         text += page.extract_text() or ""
     return text
 
-# Sidebar Controls & File Upload
+# Helper function to generate Text-to-Speech Audio
+def speak_text(text):
+    tts = gTTS(text=text, lang='ur', slow=False) # 'en' or 'ur'
+    fp = io.BytesIO()
+    tts.write_to_fp(fp)
+    fp.seek(0)
+    return fp
+
+# Sidebar Controls & Voice/File Upload
 with st.sidebar:
     st.header("⚙️ Agent Control Panel")
-    st.info("💡 **Agent Capabilities:**\n- 🖼️ Vision Analysis\n- 📄 Document/PDF Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
+    st.info("💡 **Agent Capabilities:**\n- 🎙️ Voice Assistant\n- 🖼️ Vision Analysis\n- 📄 Document Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
+    
+    st.subheader("🎙️ Voice Input")
+    st.write("Mic icon par click karke bolein:")
+    audio_bytes = audio_recorder(text="", recording_color="#e11d48", neutral_color="#2563eb", icon_name="microphone", icon_size="2x")
     
     st.subheader("📁 Upload File / Image")
     uploaded_file = st.file_uploader("Upload Image or PDF", type=["png", "jpg", "jpeg", "pdf", "txt"])
@@ -47,23 +61,23 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# Process Uploaded File Context
+# File Context Processing
 file_context = ""
 if uploaded_file is not None:
     file_type = uploaded_file.name.split(".")[-1].lower()
     if file_type in ["png", "jpg", "jpeg"]:
         st.sidebar.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
-        file_context = f"[User has attached an image: {uploaded_file.name}]"
+        file_context = f"[Attached Image: {uploaded_file.name}]"
     elif file_type == "pdf":
         pdf_text = read_pdf(uploaded_file)
-        file_context = f"\n\n[Document Content from {uploaded_file.name}]:\n{pdf_text[:3000]}" # first 3000 chars
+        file_context = f"\n\n[Document Content]:\n{pdf_text[:3000]}"
         st.sidebar.success(f"✅ PDF Loaded: {uploaded_file.name}")
     elif file_type == "txt":
         txt_text = uploaded_file.read().decode("utf-8")
-        file_context = f"\n\n[File Content from {uploaded_file.name}]:\n{txt_text[:3000]}"
-        st.sidebar.success(f"✅ Text File Loaded: {uploaded_file.name}")
+        file_context = f"\n\n[File Content]:\n{txt_text[:3000]}"
+        st.sidebar.success(f"✅ Text Loaded: {uploaded_file.name}")
 
-# Quick Prompt Suggestions
+# Quick Suggestions
 st.markdown("### 💡 Quick Try Options:")
 col1, col2, col3 = st.columns(3)
 
@@ -82,30 +96,36 @@ with col3:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display Chat History
+# Display History
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
 
-# User Input
-user_query = st.chat_input("Poochein ya uploaded file ke bare mein sawal karein...")
+# Handle Input
+user_query = st.chat_input("Poochein ya mic use karein...")
+
+# Audio input fallback trigger (simulated for voice)
+if audio_bytes and "audio_processed" not in st.session_state:
+    st.session_state["audio_processed"] = True
+    prompt_input = "Audio recording received. Please respond."
 
 final_query = user_query if user_query else prompt_input
 
 if final_query:
-    # Append file context if available
-    full_prompt = final_query + (file_context if file_context else "")
-    
     st.session_state.messages.append({"role": "user", "content": final_query})
     with st.chat_message("user"):
         st.write(final_query)
 
     with st.chat_message("assistant"):
-        with st.spinner("Agent analyzing & processing..."):
-            # Yahan aapka existing Groq / Tool response logic chalega
-            response_text = f"Agent received: '{final_query}'"
-            if file_context:
-                response_text += f"\n\n*(Document/File attached & analyzed)*"
-            
+        with st.spinner("Agent thinking & generating audio response..."):
+            response_text = f"Aapka sawal mil gaya: '{final_query}'. Agent active hai aur jawab tayar kar raha hai!"
             st.write(response_text)
+            
+            # Voice Output Generation
+            try:
+                audio_fp = speak_text(response_text)
+                st.audio(audio_fp, format='audio/mp3')
+            except Exception as e:
+                pass
+            
             st.session_state.messages.append({"role": "assistant", "content": response_text})

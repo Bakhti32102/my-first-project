@@ -39,16 +39,28 @@ def read_pdf(file):
 
 # Helper function to generate Text-to-Speech Audio
 def speak_text(text):
-    tts = gTTS(text=text, lang='ur', slow=False) # 'en' or 'ur'
+    tts = gTTS(text=text, lang='ur', slow=False)
     fp = io.BytesIO()
     tts.write_to_fp(fp)
     fp.seek(0)
     return fp
 
-# Sidebar Controls & Voice/File Upload
+# Conversation Memory Initializer
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Function to Export Chat History as Text
+def get_chat_history_text():
+    chat_text = "--- Habib's Smart Vision & AI Agent Chat Export ---\n\n"
+    for msg in st.session_state.messages:
+        role = "User" if msg["role"] == "user" else "AI Agent"
+        chat_text += f"{role}: {msg['content']}\n\n"
+    return chat_text
+
+# Sidebar Controls
 with st.sidebar:
     st.header("⚙️ Agent Control Panel")
-    st.info("💡 **Agent Capabilities:**\n- 🎙️ Voice Assistant\n- 🖼️ Vision Analysis\n- 📄 Document Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
+    st.info("💡 **Agent Capabilities:**\n- 📜 Export Chat\n- 🎙️ Voice Assistant\n- 🖼️ Vision Analysis\n- 📄 Document Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
     
     st.subheader("🎙️ Voice Input")
     st.write("Mic icon par click karke bolein:")
@@ -56,6 +68,19 @@ with st.sidebar:
     
     st.subheader("📁 Upload File / Image")
     uploaded_file = st.file_uploader("Upload Image or PDF", type=["png", "jpg", "jpeg", "pdf", "txt"])
+    
+    st.markdown("---")
+    
+    # Download Chat History Button
+    if len(st.session_state.messages) > 0:
+        chat_data = get_chat_history_text()
+        st.download_button(
+            label="📥 Download Chat History",
+            data=chat_data,
+            file_name="chat_history.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
     
     if st.button("🗑️ Clear Conversation", use_container_width=True):
         st.session_state.messages = []
@@ -92,10 +117,6 @@ with col3:
     if st.button("🧮 Solve: 25 * 4 + 150"):
         prompt_input = "Solve 25 * 4 + 150"
 
-# Conversation Memory
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
 # Display History
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -104,7 +125,6 @@ for message in st.session_state.messages:
 # Handle Input
 user_query = st.chat_input("Poochein ya mic use karein...")
 
-# Audio input fallback trigger (simulated for voice)
 if audio_bytes and "audio_processed" not in st.session_state:
     st.session_state["audio_processed"] = True
     prompt_input = "Audio recording received. Please respond."
@@ -121,7 +141,6 @@ if final_query:
             response_text = f"Aapka sawal mil gaya: '{final_query}'. Agent active hai aur jawab tayar kar raha hai!"
             st.write(response_text)
             
-            # Voice Output Generation
             try:
                 audio_fp = speak_text(response_text)
                 st.audio(audio_fp, format='audio/mp3')

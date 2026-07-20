@@ -4,9 +4,11 @@ import os
 from duckduckgo_search import DDGS
 from PIL import Image
 import PyPDF2
-from gtts import gTTS
+import edge_tts
+import asyncio
 from audio_recorder_streamlit import audio_recorder
 import io
+import requests
 
 # Page Config
 st.set_page_config(
@@ -27,7 +29,13 @@ st.markdown("""
 
 # Title Header
 st.title("🤖 Habib's Smart Vision & Multi-Tool Agent")
-st.caption("⚡ Powered by Groq | Vision, Voice, Documents, Weather, Search & Math")
+st.caption("⚡ Powered by Groq | Natural Voice, Vision, Documents, Weather, Search & Math")
+
+# Initialize Groq Client (API key Streamlit Secrets ya Environment Variable se uthayega)
+try:
+    groq_client = groq.Groq(api_key=os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY"))
+except Exception as e:
+    groq_client = None
 
 # Helper function to read PDF
 def read_pdf(file):
@@ -37,13 +45,38 @@ def read_pdf(file):
         text += page.extract_text() or ""
     return text
 
-# Helper function to generate Text-to-Speech Audio
+# Helper function for Web Search
+def web_search(query):
+    try:
+        with DDGS() as ddgs:
+            results = [r['body'] for r in ddgs.text(query, max_results=3)]
+            return "\n".join(results)
+    except Exception:
+        return "Search error occurred."
+
+# Helper function for Weather
+def get_weather(city):
+    try:
+        url = f"https://wttr.in/{city}?format=3"
+        res = requests.get(url)
+        if res.status_code == 200:
+            return res.text
+    except Exception:
+        pass
+    return "Weather info unavailable."
+
+# Helper function to generate Natural AI Urdu Voice (Edge-TTS)
 def speak_text(text):
-    tts = gTTS(text=text, lang='ur', slow=False)
-    fp = io.BytesIO()
-    tts.write_to_fp(fp)
-    fp.seek(0)
-    return fp
+    async def _generate():
+        communicate = edge_tts.Communicate(text, "ur-PK-UzmaNeural")
+        fp = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                fp.write(chunk["data"])
+        fp.seek(0)
+        return fp
+
+    return asyncio.run(_generate())
 
 # Conversation Memory Initializer
 if "messages" not in st.session_state:
@@ -60,7 +93,7 @@ def get_chat_history_text():
 # Sidebar Controls
 with st.sidebar:
     st.header("⚙️ Agent Control Panel")
-    st.info("💡 **Agent Capabilities:**\n- 📜 Export Chat\n- 🎙️ Voice Assistant\n- 🖼️ Vision Analysis\n- 📄 Document Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
+    st.info("💡 **Agent Capabilities:**\n- 🎙️ Natural AI Voice\n- 📜 Export Chat\n- 🖼️ Vision Analysis\n- 📄 Document Reader\n- 🌐 Web Search\n- 🌦️ Real-time Weather\n- 🧮 Math Calculations")
     
     st.subheader("🎙️ Voice Input")
     st.write("Mic icon par click karke bolein:")
@@ -137,14 +170,43 @@ if final_query:
         st.write(final_query)
 
     with st.chat_message("assistant"):
-        with st.spinner("Agent thinking & generating audio response..."):
-            response_text = f"Aapka sawal mil gaya: '{final_query}'. Agent active hai aur jawab tayar kar raha hai!"
+        with st.spinner("Agent thinking & generating response..."):
+            response_text = ""
+            
+            # Simple keyword tool augmentation logic
+            query_lower = final_query.lower()
+            if "weather" in query_lower or "mausam" in query_lower or "karachi" in query_lower:
+                weather_info = get_weather("Karachi")
+                response_text = f"Weather update: {weather_info}"
+            elif "news" in query_lower:
+                search_res = web_search(final_query)
+                response_text = f"Latest findings:\n{search_res}"
+            else:
+                # Standard Groq LLM Completion
+                if groq_client:
+                    try:
+                        messages_payload = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[-5:]]
+                        if file_context:
+                            messages_payload.append({"role": "user", "content": file_context})
+                        
+                        chat_completion = groq_client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=messages_payload,
+                            temperature=0.7
+                        )
+                        response_text = chat_completion.choices[0].message.content
+                    except Exception as e:
+                        response_text = f"API Error: {str(e)}"
+                else:
+                    response_text = f"Aapka sawal mil gaya: '{final_query}'. (Note: Groq API Key configure nahi hai)."
+            
             st.write(response_text)
             
+            # Voice Output Generation
             try:
                 audio_fp = speak_text(response_text)
                 st.audio(audio_fp, format='audio/mp3')
-            except Exception as e:
+            except Exception:
                 pass
-                
+            
             st.session_state.messages.append({"role": "assistant", "content": response_text})

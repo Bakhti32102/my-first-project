@@ -146,5 +146,5 @@ if final_query:
                 st.audio(audio_fp, format='audio/mp3')
             except Exception as e:
                 pass
-            
+                
             st.session_state.messages.append({"role": "assistant", "content": response_text})

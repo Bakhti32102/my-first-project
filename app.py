@@ -25,7 +25,7 @@ st.markdown("""
 
 # Title Header
 st.title("🤖 Habib's Smart Vision & Multi-Tool Agent")
-st.caption("⚡ Powered by Groq | Vision, Documents, Weather, Search & Math")
+st.caption("⚡ Powered by Groq | Vision, Documents, Real-time Weather, Search & Math")
 
 # Initialize Groq Client
 try:
@@ -50,16 +50,17 @@ def web_search(query):
     except Exception:
         return "Search error occurred."
 
-# Helper function for Weather
-def get_weather(city):
+# Helper function for Real-Time Weather (Dynamic City)
+def get_weather(city_name):
     try:
-        url = f"https://wttr.in/{city}?format=3"
-        res = requests.get(url)
+        # wttr.in live weather API (plain format for clean text)
+        url = f"https://wttr.in/{city_name}?format=3"
+        res = requests.get(url, timeout=5)
         if res.status_code == 200:
-            return res.text
+            return res.text.strip()
     except Exception:
         pass
-    return "Weather info unavailable."
+    return None
 
 # Conversation Memory Initializer
 if "messages" not in st.session_state:
@@ -144,16 +145,35 @@ if final_query:
         st.write(final_query)
 
     with st.chat_message("assistant"):
-        with st.spinner("Agent thinking..."):
+        with st.spinner("Agent processing..."):
             response_text = ""
             query_lower = final_query.lower()
             
-            if "weather" in query_lower or "mausam" in query_lower or "karachi" in query_lower:
-                weather_info = get_weather("Karachi")
-                response_text = f"Weather update: {weather_info}"
+            # FORCE WEATHER CHECK FIRST (Agar query mein weather, mausam, ya mosam ho)
+            if "weather" in query_lower or "mausam" in query_lower or "mosam" in query_lower or "barish" in query_lower or "temp" in query_lower:
+                # Sheher dhoondne ki koshish karein
+                detected_city = "Karachi" # Default
+                pakistan_cities = [
+                    "dera ghazi khan", "dg khan", "lahore", "islamabad", "rawalpindi", 
+                    "multan", "peshawar", "quetta", "faisalabad", "hyderabad", 
+                    "sukkur", "bahawalpur", "sialkot", "gujranwala"
+                ]
+                
+                for city in pakistan_cities:
+                    if city in query_lower:
+                        detected_city = city.title()
+                        break
+                
+                # Agar user ne koi aur sheher likha hai jo list mein nahi, toh query se extract karne ki koshish ya direct use
+                weather_info = get_weather(detected_city)
+                if weather_info:
+                    response_text = f"🌤️ Live Weather Update for {detected_city}:\n{weather_info}"
+                else:
+                    response_text = f"Maazrat, is waqt {detected_city} ka live weather data fetch nahi ho saka."
+            
             elif "news" in query_lower:
                 search_res = web_search(final_query)
-                response_text = f"Latest findings:\n{search_res}"
+                response_text = f"📰 Latest findings:\n{search_res}"
             else:
                 if groq_client:
                     try:

@@ -50,10 +50,9 @@ def web_search(query):
     except Exception:
         return "Search error occurred."
 
-# Helper function for Real-Time Weather (Dynamic City)
+# Helper function for Real-Time Weather
 def get_weather(city_name):
     try:
-        # wttr.in live weather API (plain format for clean text)
         url = f"https://wttr.in/{city_name}?format=3"
         res = requests.get(url, timeout=5)
         if res.status_code == 200:
@@ -84,7 +83,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Download Chat History Button
     if len(st.session_state.messages) > 0:
         chat_data = get_chat_history_text()
         st.download_button(
@@ -135,11 +133,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
 
-# Handle Input
-user_query = st.chat_input("Yahan apna sawal likhein...")
-final_query = user_query if user_query else prompt_input
-
-# Handle Input
+# Single Unified Input Handling
 user_query = st.chat_input("Yahan apna sawal likhein...")
 final_query = user_query if user_query else prompt_input
 
@@ -149,13 +143,13 @@ if final_query:
         st.write(final_query)
 
     with st.chat_message("assistant"):
-        with st.spinner("Fetching live weather & tool data..."):
+        with st.spinner("Agent processing..."):
             response_text = ""
             query_lower = final_query.lower()
             
-            # DIRECT INTERCEPTOR: Bypass LLM completely for Weather queries
+            # Weather Tool Check
             if any(word in query_lower for word in ["weather", "mausam", "mosam", "barish", "temp", "tapmaan"]):
-                detected_city = "Karachi" # Default
+                detected_city = "Karachi"
                 pakistan_cities = [
                     "dera ghazi khan", "dg khan", "lahore", "islamabad", "rawalpindi", 
                     "multan", "peshawar", "quetta", "faisalabad", "hyderabad", 
@@ -169,9 +163,9 @@ if final_query:
                 
                 weather_info = get_weather(detected_city)
                 if weather_info and "Unavailable" not in weather_info:
-                    response_text = f"🌤️ Live Weather Update for {detected_city}:\n{weather_info}\n\n(Aapke maango ke mutabiq yeh live real-time data fetch kiya gaya hai!)"
+                    response_text = f"🌤️ Live Weather Update for {detected_city}:\n{weather_info}"
                 else:
-                    response_text = f"Maazrat, is waqt {detected_city} ka live weather fetch nahi ho saka, lekin aap web search tool use kar sakte hain."
+                    response_text = f"Maazrat, is waqt {detected_city} ka live weather fetch nahi ho saka."
             
             elif "news" in query_lower or "khabar" in query_lower:
                 search_res = web_search(final_query)

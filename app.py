@@ -139,19 +139,22 @@ for message in st.session_state.messages:
 user_query = st.chat_input("Yahan apna sawal likhein...")
 final_query = user_query if user_query else prompt_input
 
+# Handle Input
+user_query = st.chat_input("Yahan apna sawal likhein...")
+final_query = user_query if user_query else prompt_input
+
 if final_query:
     st.session_state.messages.append({"role": "user", "content": final_query})
     with st.chat_message("user"):
         st.write(final_query)
 
     with st.chat_message("assistant"):
-        with st.spinner("Agent processing..."):
+        with st.spinner("Fetching live weather & tool data..."):
             response_text = ""
             query_lower = final_query.lower()
             
-            # FORCE WEATHER CHECK FIRST (Agar query mein weather, mausam, ya mosam ho)
-            if "weather" in query_lower or "mausam" in query_lower or "mosam" in query_lower or "barish" in query_lower or "temp" in query_lower:
-                # Sheher dhoondne ki koshish karein
+            # DIRECT INTERCEPTOR: Bypass LLM completely for Weather queries
+            if any(word in query_lower for word in ["weather", "mausam", "mosam", "barish", "temp", "tapmaan"]):
                 detected_city = "Karachi" # Default
                 pakistan_cities = [
                     "dera ghazi khan", "dg khan", "lahore", "islamabad", "rawalpindi", 
@@ -164,14 +167,13 @@ if final_query:
                         detected_city = city.title()
                         break
                 
-                # Agar user ne koi aur sheher likha hai jo list mein nahi, toh query se extract karne ki koshish ya direct use
                 weather_info = get_weather(detected_city)
-                if weather_info:
-                    response_text = f"🌤️ Live Weather Update for {detected_city}:\n{weather_info}"
+                if weather_info and "Unavailable" not in weather_info:
+                    response_text = f"🌤️ Live Weather Update for {detected_city}:\n{weather_info}\n\n(Aapke maango ke mutabiq yeh live real-time data fetch kiya gaya hai!)"
                 else:
-                    response_text = f"Maazrat, is waqt {detected_city} ka live weather data fetch nahi ho saka."
+                    response_text = f"Maazrat, is waqt {detected_city} ka live weather fetch nahi ho saka, lekin aap web search tool use kar sakte hain."
             
-            elif "news" in query_lower:
+            elif "news" in query_lower or "khabar" in query_lower:
                 search_res = web_search(final_query)
                 response_text = f"📰 Latest findings:\n{search_res}"
             else:
